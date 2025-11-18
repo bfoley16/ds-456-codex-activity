@@ -1,0 +1,186 @@
+# Question 3 Code
+
+<!-- import pandas as pd
+
+# adjust path/filename to match what you saved
+df = pd.read_csv("data/victory2_tows_2023.csv")
+
+# Basic structure
+print(df.shape)        # rows, columns
+print(df.dtypes)       # variable types
+print(df.head())       # first few rows
+
+# Simple summaries
+print(df["Ward"].value_counts(dropna=False))
+print(df["Neighborho"].value_counts().head(10))
+print(df["Tow_Zone"].value_counts()) -->
+<!-- 
+library(readr)
+library(dplyr)
+
+df <- read_csv("data/victory2_tows_2023.csv")
+
+glimpse(df)
+
+df %>% count(Ward, sort = TRUE)
+df %>% count(Neighborho, sort = TRUE)
+df %>% count(Tow_Zone, sort = TRUE) -->
+
+<!-- library(sf)
+library(ggplot2)
+
+gdf <- st_as_sf(df,
+                coords = c("Longitude", "Latitude"),
+                crs = 4326)
+
+ggplot(gdf) +
+  geom_sf(size = 0.5, alpha = 0.6) +
+  theme_minimal() -->
+
+
+# Question 4
+
+<!-- import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+df = pd.read_csv("data/Snow_Emergency_Victory2_Tows_2023.csv")
+
+# Basic summaries
+print(df.shape)       # rows, columns
+print(df.dtypes)      # variable types
+print(df.head())      # first 5 rows
+print(df.isna().mean().sort_values(ascending=False))  # missingness %
+
+# Simple visualizations
+df["Ward"].value_counts().plot(kind="bar")
+plt.title("Tows by Ward")
+plt.xlabel("Ward"); plt.ylabel("Count")
+plt.tight_layout(); plt.show()
+
+df["Neighborhood"].value_counts().head(10).plot(kind="bar")
+plt.title("Top 10 Neighborhoods by Tows")
+plt.tight_layout(); plt.show()
+
+# If you have a numeric column, e.g., 'FineAmount' or similar:
+num_cols = df.select_dtypes("number").columns
+for col in num_cols:
+    sns.histplot(df[col].dropna(), kde=False)
+    plt.title(f"Distribution of {col}")
+    plt.show() -->
+
+
+library(readr)
+library(dplyr)
+library(ggplot2)
+
+df <- read_csv("data/Snow_Emergency_Victory2_Tows_2023.csv")
+
+# Basic summaries
+dim(df)          # rows, columns
+glimpse(df)      # variable types
+summary(df)      # quick stats
+
+# Missingness by column
+df %>% summarise(across(everything(),
+                        ~ mean(is.na(.)),
+                        .names = "prop_na_{.col}"))
+
+# Simple visualizations
+df %>%
+  count(Ward, sort = TRUE) %>%
+  ggplot(aes(x = reorder(Ward, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Tows by Ward", x = "Ward", y = "Count")
+
+df %>%
+  count(Neighborho, sort = TRUE) %>%
+  slice_head(n = 10) %>%
+  ggplot(aes(x = reorder(Neighborho, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Top 10 Neighborhoods by Tows",
+       x = "Neighborhood", y = "Count")
+
+
+# Question 5
+
+# Install once (if you haven't already):
+# install.packages("sf")
+
+library(sf)
+library(dplyr)
+library(ggplot2)
+
+# If you already read the data earlier, reuse that object
+# e.g. df <- readr::read_csv("data/Snow_Emergency_Victory2_Tows_2023.csv")
+
+# Check column names so you know what the coordinate columns are
+names(df)
+
+# Replace "Longitude" and "Latitude" below with your actual column names
+tows_sf <- st_as_sf(
+  df,
+  coords = c("Longitude", "Latitude"),  # e.g. c("X", "Y") or c("LONGITUDE", "LATITUDE")
+  crs = 4326,                           # WGS84 lat/long
+  remove = FALSE
+)
+
+# Basic point map of all tows
+ggplot(tows_sf) +
+  geom_sf(size = 0.6, alpha = 0.5, color = "steelblue") +
+  labs(
+    title = "Snow Emergency Tow Locations",
+    subtitle = "Victory2, 2023",
+    x = "Longitude",
+    y = "Latitude"
+  ) +
+  theme_minimal()
+
+
+# We told it to add Minneapolis and roads
+
+# Install once if needed:
+# install.packages("sf")
+# install.packages("tigris")
+
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(tigris)
+
+options(tigris_use_cache = TRUE)
+
+# --- 1. Make sure your tow points exist as sf ----
+# (You should already have something like this; adjust col names if needed.)
+# df <- readr::read_csv("data/Snow_Emergency_Victory2_Tows_2023.csv")
+# tows_sf <- st_as_sf(df, coords = c("Longitude", "Latitude"), crs = 4326, remove = FALSE)
+
+# --- 2. Get Minneapolis city boundary (from Census via tigris) ----
+mpls <- places("MN", cb = TRUE, year = 2020) |>
+  filter(NAME == "Minneapolis") |>
+  st_transform(26915)   # project to a local UTM-ish CRS
+
+# Transform tow points to same CRS
+tows_sf_utm <- st_transform(tows_sf, st_crs(mpls))
+
+# --- 3. Get road lines (Hennepin County) ----
+# 053 = Hennepin County FIPS code
+roads_henn <- roads("MN", "053", year = 2020) |>
+  st_transform(st_crs(mpls))
+
+# Optional: keep only roads that intersect Minneapolis boundary
+roads_mpls <- st_intersection(roads_henn, mpls)
+
+# --- 4. Plot: boundary + roads + tow points ----
+ggplot() +
+  geom_sf(data = mpls, fill = NA, color = "black", linewidth = 0.6) +
+  geom_sf(data = roads_mpls, color = "grey80", linewidth = 0.2) +
+  geom_sf(data = tows_sf_utm, color = "red", alpha = 0.6, size = 0.5) +
+  labs(
+    title = "Snow Emergency Tow Locations in Minneapolis",
+    subtitle = "Victory2, 2023",
+    x = "Easting", y = "Northing"
+  ) +
+  theme_minimal()
